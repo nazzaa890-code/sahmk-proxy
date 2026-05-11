@@ -22,9 +22,6 @@ def claude_call(prompt, max_tokens=1000):
     }, timeout=30)
     return res.json().get("content", [{}])[0].get("text", "")
 
-# ==========================================
-# سهمك — السوق السعودي
-# ==========================================
 @app.route("/quote/<symbol>")
 def quote(symbol):
     try:
@@ -47,9 +44,6 @@ def quotes():
             results[sym] = {"error": str(e)}
     return jsonify(results)
 
-# ==========================================
-# Yahoo Finance — السوق الأمريكي
-# ==========================================
 @app.route("/us_quote/<symbol>")
 def us_quote(symbol):
     try:
@@ -101,9 +95,6 @@ def us_quotes():
             results[sym] = {"error": str(e)}
     return jsonify(results)
 
-# ==========================================
-# Claude AI — أخبار وتحليل
-# ==========================================
 @app.route("/news", methods=["POST"])
 def get_news():
     if not CLAUDE_KEY:
