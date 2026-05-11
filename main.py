@@ -22,6 +22,9 @@ def claude_call(prompt, max_tokens=1000):
     }, timeout=30)
     return res.json().get("content", [{}])[0].get("text", "")
 
+# ==========================================
+# سهمك — السوق السعودي
+# ==========================================
 @app.route("/quote/<symbol>")
 def quote(symbol):
     try:
@@ -44,6 +47,63 @@ def quotes():
             results[sym] = {"error": str(e)}
     return jsonify(results)
 
+# ==========================================
+# Yahoo Finance — السوق الأمريكي
+# ==========================================
+@app.route("/us_quote/<symbol>")
+def us_quote(symbol):
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(url, headers=headers, timeout=10)
+        data = res.json()
+        meta = data["chart"]["result"][0]["meta"]
+        price = meta.get("regularMarketPrice", 0)
+        prev = meta.get("chartPreviousClose", price)
+        change = price - prev
+        change_pct = (change / prev * 100) if prev else 0
+        volume = meta.get("regularMarketVolume", 0)
+        return jsonify({
+            "symbol": symbol,
+            "price": round(price, 2),
+            "change": round(change, 2),
+            "change_percent": round(change_pct, 2),
+            "volume": volume,
+            "source": "yahoo"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/us_quotes")
+def us_quotes():
+    symbols = request.args.get("symbols", "").split(",")
+    results = {}
+    for sym in [s.strip() for s in symbols if s.strip()]:
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
+            headers = {"User-Agent": "Mozilla/5.0"}
+            res = requests.get(url, headers=headers, timeout=8)
+            data = res.json()
+            meta = data["chart"]["result"][0]["meta"]
+            price = meta.get("regularMarketPrice", 0)
+            prev = meta.get("chartPreviousClose", price)
+            change = price - prev
+            change_pct = (change / prev * 100) if prev else 0
+            volume = meta.get("regularMarketVolume", 0)
+            results[sym] = {
+                "price": round(price, 2),
+                "change": round(change, 2),
+                "change_percent": round(change_pct, 2),
+                "volume": volume,
+                "source": "yahoo"
+            }
+        except Exception as e:
+            results[sym] = {"error": str(e)}
+    return jsonify(results)
+
+# ==========================================
+# Claude AI — أخبار وتحليل
+# ==========================================
 @app.route("/news", methods=["POST"])
 def get_news():
     if not CLAUDE_KEY:
@@ -53,7 +113,7 @@ def get_news():
         stocks = data.get("stocks", [])
         market = data.get("market", "SA")
         syms = "، ".join([f"{s['code']} {s['name']}" for s in stocks])
-        ctx = "سوق تداول السعودي" if market == "SA" else "السوق الأمريكي"
+        ctx = "سوق تداول السعودي" if market == "SA" else "السوق الأمريكي NYSE/NASDAQ"
         prompt = f'محلل مالي في {ctx}. للأسهم: {syms}\nلكل سهم خبرين واقعيين.\nأجب بـ JSON فقط:\n{{"stocks":{{"رمز":{{"news":[{{"headline":"نص","sentiment":"positive|negative|neutral","source":"مصدر","time":"منذ X ساعة"}}],"overall_sentiment":"positive|negative|neutral"}}}}}}'
         text = claude_call(prompt)
         text = re.sub(r'```json|```', '', text).strip()
@@ -95,6 +155,8 @@ RSI:{d['rsi']} | Stoch:{d['stoch']} | MACD:{d['macd']}
 def health():
     return jsonify({
         "status": "ok",
+        "sa_market": "سهمك API",
+        "us_market": "Yahoo Finance",
         "claude": "متصل" if CLAUDE_KEY else "مفتاح مفقود"
     })
 
